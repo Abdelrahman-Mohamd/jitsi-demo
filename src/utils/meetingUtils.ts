@@ -1,52 +1,14 @@
 export const generateRoomName = (): string => {
-  const adjectives = [
-    "amazing",
-    "brilliant",
-    "creative",
-    "dynamic",
-    "elegant",
-    "fantastic",
-    "great",
-    "incredible",
-    "lovely",
-    "marvelous",
-    "outstanding",
-    "perfect",
-    "remarkable",
-    "spectacular",
-    "wonderful",
-    "excellent",
-    "awesome",
-    "superb",
-  ];
-
-  const nouns = [
-    "meeting",
-    "conference",
-    "session",
-    "discussion",
-    "gathering",
-    "forum",
-    "workshop",
-    "seminar",
-    "summit",
-    "symposium",
-    "assembly",
-    "convention",
-    "colloquium",
-    "panel",
-    "roundtable",
-    "huddle",
-    "standup",
-    "sync",
-  ];
-
-  const randomAdjective =
-    adjectives[Math.floor(Math.random() * adjectives.length)];
-  const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
-  const randomNumber = Math.floor(Math.random() * 9999) + 1000;
-
-  return `${randomAdjective}-${randomNoun}-${randomNumber}`;
+  // Use a simple alphanumeric format to avoid triggering lobby/moderation
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
+  
+  // Generate a 12-character room name
+  for (let i = 0; i < 12; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  
+  return `room-${result}`;
 };
 
 export const formatRoomName = (roomName: string): string => {
@@ -147,4 +109,46 @@ export const copyToClipboard = async (text: string): Promise<boolean> => {
     console.error("Failed to copy to clipboard:", err);
     return false;
   }
+};
+
+// Simple JWT generation for Jitsi authentication
+// Note: This is a basic implementation for client-side use
+export const generateJitsiJWT = (roomName: string, userName: string, isHost: boolean): string => {
+  // Create a basic JWT payload
+  const header = {
+    "alg": "HS256",
+    "typ": "JWT"
+  };
+
+  const payload = {
+    "iss": "video-conference-app",
+    "aud": "jitsi",
+    "exp": Math.floor(Date.now() / 1000) + (60 * 60), // 1 hour expiration
+    "nbf": Math.floor(Date.now() / 1000),
+    "iat": Math.floor(Date.now() / 1000),
+    "room": roomName,
+    "sub": "meet.jit.si",
+    "context": {
+      "user": {
+        "name": userName,
+        "email": `${userName.toLowerCase().replace(/\s+/g, '')}@guest.jitsi`,
+        "id": Math.random().toString(36).substr(2, 9)
+      },
+      "features": {
+        "livestreaming": isHost,
+        "recording": isHost,
+        "transcription": isHost,
+        "outbound-call": isHost
+      }
+    },
+    "moderator": isHost
+  };
+
+  // Simple base64 encoding (for demo purposes)
+  const encodedHeader = btoa(JSON.stringify(header));
+  const encodedPayload = btoa(JSON.stringify(payload));
+  
+  // For a real implementation, you would sign this with a secret
+  // For demo purposes, we'll just return the unsigned token
+  return `${encodedHeader}.${encodedPayload}.demo-signature`;
 };

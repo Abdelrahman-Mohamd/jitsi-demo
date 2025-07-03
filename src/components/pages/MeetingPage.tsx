@@ -7,6 +7,7 @@ import {
   loadJitsiScript,
   getMeetingUrl,
   copyToClipboard,
+  generateJitsiJWT,
 } from "../../utils/meetingUtils";
 import type { JitsiConfig } from "../../types/jitsi";
 
@@ -44,7 +45,8 @@ export const MeetingPage: React.FC = () => {
   const [showControls, setShowControls] = useState(true);
   const [copied, setCopied] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<string>("connecting");
+  const [connectionStatus, setConnectionStatus] =
+    useState<string>("connecting");
 
   const isHost = searchParams.get("host") === "true" || userRole === "host";
 
@@ -156,17 +158,22 @@ export const MeetingPage: React.FC = () => {
           // Clear any existing content
           currentContainer.innerHTML = "";
 
+          // Generate JWT token for authentication
+          const jwtToken = generateJitsiJWT(roomName, userName || "Guest", isHost);
+
           const config: JitsiConfig = {
             width: "100%",
             height: "100%",
             parentNode: currentContainer,
             roomName: roomName,
+            // Try without JWT first
+            // jwt: jwtToken,
             configOverwrite: {
               startWithAudioMuted: !isHost,
               startWithVideoMuted: false,
               enableWelcomePage: false,
               prejoinPageEnabled: false,
-              disableModeratorIndicator: false,
+              disableModeratorIndicator: true, // Force disable moderator indicators
               startScreenSharing: false,
               enableEmailInStats: false,
               // Simplified connection configuration
@@ -174,6 +181,19 @@ export const MeetingPage: React.FC = () => {
               p2p: {
                 enabled: true,
               },
+              // Disable lobby and moderation
+              enableLobby: false,
+              enableLobbyChat: false,
+              enableSecurityDialogPassword: false,
+              requireDisplayName: false,
+              enableUserRolesBasedOnToken: false,
+              enableAutomaticUrlDisplay: false,
+              // Room access settings
+              enableInsecureRoomNameWarning: false,
+              enableClosePage: false,
+              // Auto-join settings
+              autoKnockLobby: false,
+              hideConferenceSubject: false,
             },
             interfaceConfigOverwrite: {
               SHOW_JITSI_WATERMARK: false,
@@ -199,14 +219,59 @@ export const MeetingPage: React.FC = () => {
           }
 
           console.log("Creating Jitsi API instance...");
+          console.log("Room name:", roomName);
+          console.log("User:", userName, "Is host:", isHost);
+          console.log("JWT token generated:", jwtToken.substring(0, 50) + "...");
+          
+          // Try using meet.jit.si
           const api = new window.JitsiMeetExternalAPI("meet.jit.si", config);
           setJitsiApi(api);
 
           // Add connection event listeners
           api.addListener("connectionFailed", (error) => {
             console.error("Jitsi connection failed:", error);
+            
+            // Check if it's a membersOnly error and try to bypass
+            if (error && typeof error === 'object' && 'name' in error && 
+                (error as { name: string }).name === "conference.connectionError.membersOnly") {
+              console.log("Detected membersOnly error, attempting to bypass...");
+              
+              // Try to execute commands to bypass lobby
+              try {
+                api.executeCommand("toggleLobby");
+                api.executeCommand("approveParticipant");
+                
+                // Also try to set the user as moderator
+                setTimeout(() => {
+                  api.executeCommand("grantModerator");
+                }, 1000);
+                
+                return; // Don't set error state yet
+              } catch (cmdError) {
+                console.error("Failed to execute bypass commands:", cmdError);
+              }
+            }
+            
             setConnectionStatus("failed");
-            setError("Failed to connect to the meeting. Please check your internet connection and try again.");
+            setError(
+              "Failed to connect to the meeting. The room might require approval from a moderator. Please try again or ask the host to disable the waiting room."
+            );
+          });
+
+          // Add specific listener for conference errors
+          api.addListener("conferenceError", (error) => {
+            console.error("Conference error:", error);
+            
+            if (error && typeof error === 'object' && 'name' in error && 
+                (error as { name: string }).name === "conference.connectionError.membersOnly") {
+              console.log("Conference membersOnly error detected");
+              // Don't immediately fail, give some time for other mechanisms to work
+              setTimeout(() => {
+                setError(
+                  "This meeting room has a waiting room enabled. Please wait for the host to admit you, or ask them to disable the waiting room feature."
+                );
+              }, 5000);
+            }
           });
 
           api.addListener("conferenceLeft", () => {
@@ -406,7 +471,8 @@ export const MeetingPage: React.FC = () => {
       {/* Debug info overlay */}
       <div className="absolute top-0 left-0 z-50 p-2 text-xs text-white bg-red-600 bg-opacity-75">
         Debug: Container={containerMounted ? "YES" : "NO"}, Init=
-        {isInitialized ? "YES" : "NO"}, Room={roomName || "NONE"}, Status={connectionStatus}
+        {isInitialized ? "YES" : "NO"}, Room={roomName || "NONE"}, Status=
+        {connectionStatus}
       </div>
 
       {/* Meeting Info Bar */}

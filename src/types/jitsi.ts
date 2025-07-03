@@ -29,6 +29,7 @@ export interface JitsiConfig {
   height: string | number;
   parentNode: HTMLElement;
   roomName: string;
+  jwt?: string;
   configOverwrite?: {
     startWithAudioMuted?: boolean;
     startWithVideoMuted?: boolean;
@@ -56,6 +57,23 @@ export interface JitsiConfig {
     enableTcc?: boolean;
     enableRemb?: boolean;
     openBridgeChannel?: boolean;
+    // Lobby and security configuration
+    enableLobby?: boolean;
+    enableLobbyChat?: boolean;
+    enableSecurityDialogPassword?: boolean;
+    requireDisplayName?: boolean;
+    enableUserRolesBasedOnToken?: boolean;
+    enableAutomaticUrlDisplay?: boolean;
+    disableLobby?: boolean;
+    moderatedRoomServiceUrl?: string | undefined;
+    enableModerationForAnonymousUsers?: boolean;
+    enableInsecureRoomNameWarning?: boolean;
+    enableClosePage?: boolean;
+    autoKnockLobby?: boolean;
+    hideConferenceSubject?: boolean;
+    // Additional bypass options
+    enableGuestDomain?: boolean;
+    disableThirdPartyRequests?: boolean;
   };
   interfaceConfigOverwrite?: {
     TOOLBAR_BUTTONS?: string[];
