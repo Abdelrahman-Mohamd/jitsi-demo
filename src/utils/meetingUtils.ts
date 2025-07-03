@@ -81,30 +81,37 @@ export const isJitsiLoaded = (): boolean => {
 export const loadJitsiScript = (): Promise<void> => {
   return new Promise((resolve, reject) => {
     if (isJitsiLoaded()) {
+      console.log("Jitsi API already loaded");
       resolve();
       return;
     }
 
+    console.log("Creating Jitsi script element...");
     const script = document.createElement("script");
     script.src = "https://meet.jit.si/external_api.js";
     script.async = true;
     script.crossOrigin = "anonymous";
 
     script.onload = () => {
+      console.log("Jitsi script onload fired");
       // Wait a bit for the API to be fully loaded
       setTimeout(() => {
         if (isJitsiLoaded()) {
+          console.log("Jitsi API confirmed loaded after timeout");
           resolve();
         } else {
+          console.error("Jitsi API still not available after timeout");
           reject(new Error("Jitsi API failed to load properly"));
         }
-      }, 100);
+      }, 500); // Increased timeout for Netlify
     };
 
-    script.onerror = () => {
+    script.onerror = (error) => {
+      console.error("Jitsi script failed to load:", error);
       reject(new Error("Failed to load Jitsi Meet External API"));
     };
 
+    console.log("Appending Jitsi script to head...");
     document.head.appendChild(script);
   });
 };

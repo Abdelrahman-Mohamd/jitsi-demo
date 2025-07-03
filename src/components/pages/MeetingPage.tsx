@@ -61,6 +61,14 @@ export const MeetingPage: React.FC = () => {
     setMeetingUrl(url);
 
     const initializeJitsi = async () => {
+      // In production, reset the initialization state to allow retry
+      if (isInitialized && window.location.hostname.includes("netlify")) {
+        console.log(
+          "Netlify environment detected, allowing re-initialization..."
+        );
+        setIsInitialized(false);
+      }
+
       if (isInitialized) {
         console.log("Jitsi already initialized, skipping...");
         return;
@@ -79,6 +87,7 @@ export const MeetingPage: React.FC = () => {
 
         console.log("Loading Jitsi script...");
         await loadJitsiScript();
+        console.log("Jitsi script loaded successfully");
 
         if (jitsiContainerRef.current && roomName) {
           console.log("Setting up Jitsi container...");
@@ -174,14 +183,22 @@ export const MeetingPage: React.FC = () => {
 
           console.log("Jitsi initialization complete");
           setIsInMeeting(true);
+        } else {
+          console.log("Container or room name not available", {
+            container: !!jitsiContainerRef.current,
+            roomName: roomName,
+          });
         }
       } catch (err) {
+        console.error("Jitsi initialization error:", err);
         const errorMessage =
           err instanceof Error ? err.message : "Unknown error occurred";
         setError(
           `Failed to initialize video conference: ${errorMessage}. Please ensure you're using HTTPS and have granted camera/microphone permissions.`
         );
-        console.error("Jitsi initialization error:", err);
+
+        // Reset initialization state to allow retry
+        setIsInitialized(false);
       } finally {
         setLoading(false);
       }
