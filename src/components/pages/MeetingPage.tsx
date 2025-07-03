@@ -8,7 +8,6 @@ import {
   loadJitsiScript,
   getMeetingUrl,
   copyToClipboard,
-  generateJitsiJWT,
 } from "../../utils/meetingUtils";
 import type { JitsiConfig } from "../../types/jitsi";
 
@@ -164,20 +163,11 @@ export const MeetingPage: React.FC = () => {
           // Clear any existing content
           currentContainer.innerHTML = "";
 
-          // Generate JWT token for authentication
-          const jwtToken = generateJitsiJWT(
-            roomName,
-            userName || "Guest",
-            isHost
-          );
-
           const config: JitsiConfig = {
             width: "100%",
             height: "100%",
             parentNode: currentContainer,
             roomName: roomName,
-            // Use JWT token to authenticate as moderator
-            jwt: jwtToken,
             configOverwrite: {
               startWithAudioMuted: !isHost,
               startWithVideoMuted: false,
@@ -187,7 +177,7 @@ export const MeetingPage: React.FC = () => {
               enableEmailInStats: false,
               // Basic P2P configuration
               enableP2P: true,
-              // Minimal lobby configuration
+              // Minimal lobby configuration - note: these may be overridden by server
               enableLobby: false,
               requireDisplayName: false,
             },
@@ -218,18 +208,25 @@ export const MeetingPage: React.FC = () => {
           console.log("Room name:", roomName);
           console.log("User:", userName, "Is host:", isHost);
           console.log("Server:", currentJitsiServer);
-          console.log(
-            "JWT token generated:",
-            jwtToken.substring(0, 50) + "..."
-          );
 
           // Use the current selected server
           const api = new window.JitsiMeetExternalAPI(currentJitsiServer, config);
           setJitsiApi(api);
 
+          // Set a timeout to detect if connection hangs
+          const connectionTimeout = setTimeout(() => {
+            console.log("Connection timeout - showing server selection");
+            setConnectionStatus("timeout");
+            setShowServerSelection(true);
+            setError(
+              `Connection to ${currentJitsiServer} timed out. This may be due to network issues or server-side restrictions. Please try a different server.`
+            );
+          }, 15000); // 15 second timeout
+
           // Add connection event listeners
           api.addListener("connectionFailed", (error) => {
             console.error("Jitsi connection failed:", error);
+            clearTimeout(connectionTimeout); // Clear timeout on explicit failure
 
             // Check if it's a membersOnly error and show server selection
             if (
@@ -242,15 +239,16 @@ export const MeetingPage: React.FC = () => {
               console.log(
                 "Detected membersOnly error, showing server selection..."
               );
-              setConnectionStatus("failed");
+              setConnectionStatus("membersOnly");
               setShowServerSelection(true);
               setError(
-                `Connection failed on ${currentJitsiServer}. This server has waiting rooms enabled. Try an alternative server or ask the host to disable the waiting room.`
+                `Connection failed: waiting room is enabled on ${currentJitsiServer}. Try an alternative server or ask the host to disable the waiting room.`
               );
               return; // Don't set generic error
             }
 
             setConnectionStatus("failed");
+            setShowServerSelection(true);
             setError(
               `Failed to connect to ${currentJitsiServer}. Please try again or select a different server.`
             );
@@ -259,6 +257,7 @@ export const MeetingPage: React.FC = () => {
           // Add specific listener for conference errors
           api.addListener("conferenceError", (error) => {
             console.error("Conference error:", error);
+            clearTimeout(connectionTimeout); // Clear timeout on explicit error
 
             if (
               error &&
@@ -268,6 +267,7 @@ export const MeetingPage: React.FC = () => {
                 "conference.connectionError.membersOnly"
             ) {
               console.log("Conference membersOnly error detected");
+              setConnectionStatus("membersOnly");
               setShowServerSelection(true);
               setError(
                 `Waiting room is enabled on ${currentJitsiServer}. Please try an alternative server or ask the host to admit you.`
@@ -283,6 +283,7 @@ export const MeetingPage: React.FC = () => {
 
           api.addListener("conferenceJoined", () => {
             console.log("Conference joined successfully");
+            clearTimeout(connectionTimeout); // Clear timeout on successful join
             setConnectionStatus("connected");
             setIsInMeeting(true);
             setError(null); // Clear any previous errors

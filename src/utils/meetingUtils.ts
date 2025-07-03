@@ -1,25 +1,9 @@
 export const generateRoomName = (): string => {
-  // Generate a UUID-like format that might bypass lobby detection
-  const chars = "abcdef0123456789";
+  // Generate a simple alphanumeric room name to avoid any special character issues
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   let result = "";
 
-  // Generate 8-4-4-4-12 format like a UUID
-  for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  result += "-";
-  for (let i = 0; i < 4; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  result += "-";
-  for (let i = 0; i < 4; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  result += "-";
-  for (let i = 0; i < 4; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  result += "-";
+  // Generate a shorter, simpler room name (12 characters)
   for (let i = 0; i < 12; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
