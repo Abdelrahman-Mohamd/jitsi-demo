@@ -16,6 +16,7 @@ export const MeetingPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const jitsiContainerRef = useRef<HTMLDivElement>(null);
+  const intervalRef = useRef<number | null>(null);
   const [containerMounted, setContainerMounted] = useState(false);
 
   const {
@@ -398,7 +399,7 @@ export const MeetingPage: React.FC = () => {
           }, 1000);
 
           // Add a recurring check to force iframe visibility
-          const intervalId = setInterval(() => {
+          intervalRef.current = setInterval(() => {
             const container = document.getElementById("jitsi-container");
             const iframe = container?.querySelector("iframe");
             
@@ -418,10 +419,42 @@ export const MeetingPage: React.FC = () => {
                 background: #000 !important;
               `;
             }
+            
+            // Also try to force video elements to be visible
+            if (iframe) {
+              try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                if (iframeDoc) {
+                  // Force all video elements to be visible
+                  const videos = iframeDoc.querySelectorAll('video');
+                  videos.forEach(video => {
+                    video.style.cssText = `
+                      display: block !important;
+                      visibility: visible !important;
+                      opacity: 1 !important;
+                      width: 100% !important;
+                      height: 100% !important;
+                      object-fit: cover !important;
+                    `;
+                  });
+                  
+                  // Force video containers to be visible
+                  const containers = iframeDoc.querySelectorAll('.videocontainer, .large-video-container, .filmstrip, .large-video, #largeVideoContainer, #dominantSpeaker');
+                  containers.forEach(container => {
+                    (container as HTMLElement).style.cssText = `
+                      display: block !important;
+                      visibility: visible !important;
+                      opacity: 1 !important;
+                      width: 100% !important;
+                      height: 100% !important;
+                    `;
+                  });
+                }
+              } catch {
+                // Ignore cross-origin errors
+              }
+            }
           }, 2000);
-
-          // Clear interval when component unmounts
-          return () => clearInterval(intervalId);
 
           console.log("Setting up event listeners...");
           // Event listeners
@@ -542,6 +575,9 @@ export const MeetingPage: React.FC = () => {
 
     return () => {
       clearTimeout(timeoutId);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
       if (jitsiApi) {
         jitsiApi.dispose();
       }
