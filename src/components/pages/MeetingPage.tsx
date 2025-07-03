@@ -59,21 +59,15 @@ export const MeetingPage: React.FC = () => {
 
     const url = getMeetingUrl(roomName);
     setMeetingUrl(url);
+  }, [roomName, userName, navigate]);
+
+  // Separate effect for Jitsi initialization that waits for container
+  useEffect(() => {
+    if (!roomName || !userName.trim() || isInitialized) {
+      return;
+    }
 
     const initializeJitsi = async () => {
-      // In production, reset the initialization state to allow retry
-      if (isInitialized && window.location.hostname.includes("netlify")) {
-        console.log(
-          "Netlify environment detected, allowing re-initialization..."
-        );
-        setIsInitialized(false);
-      }
-
-      if (isInitialized) {
-        console.log("Jitsi already initialized, skipping...");
-        return;
-      }
-
       try {
         console.log("Starting Jitsi initialization...");
         setIsInitialized(true);
@@ -89,24 +83,42 @@ export const MeetingPage: React.FC = () => {
         await loadJitsiScript();
         console.log("Jitsi script loaded successfully");
 
-        // Wait for container to be available
+        // Robust container finding with retries
+        let containerElement: HTMLElement | null = null;
         let retries = 0;
-        const maxRetries = 10;
-        while (!jitsiContainerRef.current && retries < maxRetries) {
-          console.log(`Waiting for container... attempt ${retries + 1}`);
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          retries++;
+        const maxRetries = 15;
+        
+        while (!containerElement && retries < maxRetries) {
+          // Try ref first, then getElementById as fallback
+          containerElement = jitsiContainerRef.current || document.getElementById("jitsi-container");
+          
+          if (!containerElement) {
+            console.log(`Container not found, retry ${retries + 1}/${maxRetries}`);
+            await new Promise(resolve => setTimeout(resolve, 200));
+            retries++;
+          }
         }
 
-        if (jitsiContainerRef.current && roomName) {
+        if (!containerElement) {
+          throw new Error("Jitsi container not available after maximum retries");
+        }
+
+        console.log("Container found:", {
+          viaRef: !!jitsiContainerRef.current,
+          viaId: !!document.getElementById("jitsi-container"),
+          element: !!containerElement,
+          retries: retries,
+        });
+
+        if (roomName) {
           console.log("Setting up Jitsi container...");
           // Clear any existing content
-          jitsiContainerRef.current.innerHTML = "";
+          containerElement.innerHTML = "";
 
           const config: JitsiConfig = {
             width: "100%",
             height: "100%",
-            parentNode: jitsiContainerRef.current,
+            parentNode: containerElement,
             roomName: roomName,
             configOverwrite: {
               startWithAudioMuted: !isHost,
@@ -146,8 +158,19 @@ export const MeetingPage: React.FC = () => {
 
           // Wait a moment and check if iframe was created
           setTimeout(() => {
-            const iframe = jitsiContainerRef.current?.querySelector("iframe");
-            const container = jitsiContainerRef.current;
+            const container = containerElement;
+            const iframe = container?.querySelector("iframe");
+            
+            // Force iframe to take full size if it exists
+            if (iframe) {
+              iframe.style.width = "100%";
+              iframe.style.height = "100%";
+              iframe.style.border = "none";
+              iframe.style.position = "absolute";
+              iframe.style.top = "0";
+              iframe.style.left = "0";
+            }
+            
             console.log("Iframe check:", {
               iframe: !!iframe,
               iframeSrc: iframe?.src || "none",
@@ -192,11 +215,6 @@ export const MeetingPage: React.FC = () => {
 
           console.log("Jitsi initialization complete");
           setIsInMeeting(true);
-        } else {
-          console.log("Container or room name not available", {
-            container: !!jitsiContainerRef.current,
-            roomName: roomName,
-          });
         }
       } catch (err) {
         console.error("Jitsi initialization error:", err);
@@ -213,12 +231,13 @@ export const MeetingPage: React.FC = () => {
       }
     };
 
-    // Add a small delay to ensure DOM is ready, especially for Netlify
-    setTimeout(() => {
+    // Use a small delay to ensure the DOM is fully mounted
+    const timeoutId = setTimeout(() => {
       initializeJitsi();
-    }, 100);
+    }, 50);
 
     return () => {
+      clearTimeout(timeoutId);
       if (jitsiApi) {
         jitsiApi.dispose();
       }
@@ -226,7 +245,6 @@ export const MeetingPage: React.FC = () => {
   }, [
     roomName,
     userName,
-    navigate,
     isHost,
     jitsiApi,
     leaveMeeting,
@@ -236,6 +254,7 @@ export const MeetingPage: React.FC = () => {
     setLoading,
     userEmail,
     isInitialized,
+    navigate,
   ]);
 
   const handleLeaveMeeting = () => {
@@ -498,8 +517,16 @@ export const MeetingPage: React.FC = () => {
         )}
       </button>
 
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-40">
+          <Loading message="Joining meeting..." />
+        </div>
+      )}
+
       {/* Jitsi Container */}
       <div
+        id="jitsi-container"
         ref={jitsiContainerRef}
         className="jitsi-container"
         style={{
@@ -512,13 +539,7 @@ export const MeetingPage: React.FC = () => {
           background: "#000",
         }}
         onLoad={() => console.log("Jitsi container loaded")}
-      >
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
-            <Loading message="Joining meeting..." />
-          </div>
-        )}
-      </div>
+      ></div>
 
       {/* Fallback: Show direct Jitsi link if initialization fails */}
       {error && (
