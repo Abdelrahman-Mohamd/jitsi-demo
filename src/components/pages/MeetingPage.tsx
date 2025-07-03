@@ -719,10 +719,26 @@ export const MeetingPage: React.FC = () => {
       {error && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-gray-900 bg-opacity-90">
           <div className="max-w-md p-8 text-center text-white bg-gray-800 rounded-lg">
-            <h2 className="mb-4 text-xl font-bold">Having trouble joining?</h2>
-            <p className="mb-6 text-gray-300">
-              You can join directly through Jitsi Meet:
-            </p>
+            <h2 className="mb-4 text-xl font-bold">Unable to join meeting</h2>
+            <p className="mb-4 text-gray-300">{error}</p>
+            
+            {error.includes("waiting room") || error.includes("lobby") ? (
+              <div className="mb-6 text-sm text-gray-400">
+                <p className="mb-2">
+                  The meeting room has a waiting room enabled. You can:
+                </p>
+                <ul className="text-left list-disc list-inside">
+                  <li>Wait for the host to admit you</li>
+                  <li>Ask the host to disable the waiting room</li>
+                  <li>Join directly through Jitsi Meet</li>
+                </ul>
+              </div>
+            ) : (
+              <p className="mb-6 text-gray-300">
+                You can try joining directly through Jitsi Meet:
+              </p>
+            )}
+            
             <a
               href={meetingUrl}
               target="_blank"
