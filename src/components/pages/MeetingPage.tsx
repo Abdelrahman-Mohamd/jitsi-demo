@@ -42,6 +42,7 @@ export const MeetingPage: React.FC = () => {
   const [meetingUrl, setMeetingUrl] = useState("");
   const [showControls, setShowControls] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const isHost = searchParams.get("host") === "true" || userRole === "host";
 
@@ -59,6 +60,133 @@ export const MeetingPage: React.FC = () => {
     const url = getMeetingUrl(roomName);
     setMeetingUrl(url);
 
+    const initializeJitsi = async () => {
+      if (isInitialized) {
+        console.log("Jitsi already initialized, skipping...");
+        return;
+      }
+
+      try {
+        console.log("Starting Jitsi initialization...");
+        setIsInitialized(true);
+        setLoading(true);
+        setError(null);
+
+        // Check if we're in a secure context (required for camera/microphone)
+        if (!window.isSecureContext) {
+          throw new Error("HTTPS is required for camera and microphone access");
+        }
+
+        console.log("Loading Jitsi script...");
+        await loadJitsiScript();
+
+        if (jitsiContainerRef.current && roomName) {
+          console.log("Setting up Jitsi container...");
+          // Clear any existing content
+          jitsiContainerRef.current.innerHTML = "";
+
+          const config: JitsiConfig = {
+            width: "100%",
+            height: "100%",
+            parentNode: jitsiContainerRef.current,
+            roomName: roomName,
+            configOverwrite: {
+              startWithAudioMuted: !isHost,
+              startWithVideoMuted: false,
+              enableWelcomePage: false,
+              prejoinPageEnabled: false,
+              disableModeratorIndicator: false,
+              startScreenSharing: false,
+              enableEmailInStats: false,
+            },
+            interfaceConfigOverwrite: {
+              SHOW_JITSI_WATERMARK: false,
+              SHOW_WATERMARK_FOR_GUESTS: false,
+              SHOW_BRAND_WATERMARK: false,
+              SHOW_CHROME_EXTENSION_BANNER: false,
+              DEFAULT_REMOTE_DISPLAY_NAME: "Participant",
+              DEFAULT_LOCAL_DISPLAY_NAME: userName || "You",
+              MOBILE_APP_PROMO: false,
+              NATIVE_APP_NAME: "Video Conference",
+              PROVIDER_NAME: "Video Conference",
+              SHOW_DEEP_LINKING_IMAGE: false,
+            },
+            userInfo: {
+              displayName: userName,
+              email: userEmail || undefined,
+            },
+          };
+
+          // Ensure the API is available
+          if (!window.JitsiMeetExternalAPI) {
+            throw new Error("Jitsi Meet External API not loaded");
+          }
+
+          console.log("Creating Jitsi API instance...");
+          const api = new window.JitsiMeetExternalAPI("meet.jit.si", config);
+          setJitsiApi(api);
+
+          // Wait a moment and check if iframe was created
+          setTimeout(() => {
+            const iframe = jitsiContainerRef.current?.querySelector("iframe");
+            const container = jitsiContainerRef.current;
+            console.log("Iframe check:", {
+              iframe: !!iframe,
+              iframeSrc: iframe?.src || "none",
+              iframeStyle: iframe
+                ? {
+                    width: iframe.style.width,
+                    height: iframe.style.height,
+                    display: iframe.style.display,
+                    position: iframe.style.position,
+                    zIndex: iframe.style.zIndex,
+                  }
+                : "none",
+              containerChildren: container?.children.length,
+              containerRect: container?.getBoundingClientRect(),
+              containerHTML: container?.innerHTML.substring(0, 200),
+            });
+          }, 1000);
+
+          console.log("Setting up event listeners...");
+          // Event listeners
+          api.addListener("readyToClose", () => {
+            console.log("Meeting ready to close");
+            leaveMeeting();
+            navigate("/");
+          });
+          api.addListener("participantJoined", () => {
+            console.log("Participant joined");
+            setParticipants((prev) => prev + 1);
+          });
+          api.addListener("participantLeft", () => {
+            console.log("Participant left");
+            setParticipants((prev) => Math.max(0, prev - 1));
+          });
+          api.addListener("videoConferenceJoined", () => {
+            console.log("Video conference joined");
+            setParticipants(1); // Include self
+          });
+          api.addListener("videoConferenceLeft", () => {
+            console.log("Video conference left");
+            setParticipants(0);
+          });
+
+          console.log("Jitsi initialization complete");
+          setIsInMeeting(true);
+        }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Unknown error occurred";
+        setError(
+          `Failed to initialize video conference: ${errorMessage}. Please ensure you're using HTTPS and have granted camera/microphone permissions.`
+        );
+        console.error("Jitsi initialization error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     initializeJitsi();
 
     return () => {
@@ -66,124 +194,20 @@ export const MeetingPage: React.FC = () => {
         jitsiApi.dispose();
       }
     };
-  }, [roomName, userName, navigate]);
-
-  const initializeJitsi = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      await loadJitsiScript();
-
-      if (jitsiContainerRef.current && roomName) {
-        const config: JitsiConfig = {
-          width: "100%",
-          height: "100%",
-          parentNode: jitsiContainerRef.current,
-          roomName: roomName,
-          configOverwrite: {
-            startWithAudioMuted: !isHost,
-            startWithVideoMuted: false,
-            enableWelcomePage: false,
-            prejoinPageEnabled: false,
-            disableModeratorIndicator: false,
-            startScreenSharing: false,
-            enableEmailInStats: false,
-          },
-          interfaceConfigOverwrite: {
-            TOOLBAR_BUTTONS: [
-              "microphone",
-              "camera",
-              "closedcaptions",
-              "desktop",
-              "fullscreen",
-              "fodeviceselection",
-              "hangup",
-              "profile",
-              "chat",
-              "recording",
-              "livestreaming",
-              "etherpad",
-              "sharedvideo",
-              "settings",
-              "raisehand",
-              "videoquality",
-              "filmstrip",
-              "invite",
-              "feedback",
-              "stats",
-              "shortcuts",
-              "tileview",
-              "videobackgroundblur",
-              "download",
-              "help",
-              "mute-everyone",
-              "security",
-            ],
-            SETTINGS_SECTIONS: [
-              "devices",
-              "language",
-              "moderator",
-              "profile",
-              "calendar",
-            ],
-            SHOW_JITSI_WATERMARK: false,
-            SHOW_WATERMARK_FOR_GUESTS: false,
-            SHOW_BRAND_WATERMARK: false,
-            SHOW_CHROME_EXTENSION_BANNER: false,
-            DEFAULT_REMOTE_DISPLAY_NAME: "Participant",
-            DEFAULT_LOCAL_DISPLAY_NAME: userName || "You",
-            MOBILE_APP_PROMO: false,
-            NATIVE_APP_NAME: "Video Conference",
-            PROVIDER_NAME: "Video Conference",
-            SHOW_DEEP_LINKING_IMAGE: false,
-          },
-          userInfo: {
-            displayName: userName,
-            email: userEmail || undefined,
-          },
-        };
-
-        const api = new window.JitsiMeetExternalAPI("meet.jit.si", config);
-        setJitsiApi(api);
-
-        // Event listeners
-        api.addListener("readyToClose", handleReadyToClose);
-        api.addListener("participantJoined", handleParticipantJoined);
-        api.addListener("participantLeft", handleParticipantLeft);
-        api.addListener("videoConferenceJoined", handleVideoConferenceJoined);
-        api.addListener("videoConferenceLeft", handleVideoConferenceLeft);
-
-        setIsInMeeting(true);
-      }
-    } catch (err) {
-      setError("Failed to initialize video conference. Please try again.");
-      console.error("Jitsi initialization error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReadyToClose = () => {
-    leaveMeeting();
-    navigate("/");
-  };
-
-  const handleParticipantJoined = () => {
-    setParticipants((prev) => prev + 1);
-  };
-
-  const handleParticipantLeft = () => {
-    setParticipants((prev) => Math.max(0, prev - 1));
-  };
-
-  const handleVideoConferenceJoined = () => {
-    setParticipants(1); // Include self
-  };
-
-  const handleVideoConferenceLeft = () => {
-    setParticipants(0);
-  };
+  }, [
+    roomName,
+    userName,
+    navigate,
+    isHost,
+    jitsiApi,
+    leaveMeeting,
+    setError,
+    setIsInMeeting,
+    setJitsiApi,
+    setLoading,
+    userEmail,
+    isInitialized,
+  ]);
 
   const handleLeaveMeeting = () => {
     leaveMeeting();
@@ -448,9 +472,53 @@ export const MeetingPage: React.FC = () => {
       {/* Jitsi Container */}
       <div
         ref={jitsiContainerRef}
-        className="w-full h-screen"
-        style={{ minHeight: "100vh" }}
-      />
+        className="jitsi-container"
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          zIndex: 999,
+          background: "#000",
+        }}
+        onLoad={() => console.log("Jitsi container loaded")}
+      >
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
+            <Loading message="Joining meeting..." />
+          </div>
+        )}
+      </div>
+
+      {/* Fallback: Show direct Jitsi link if initialization fails */}
+      {error && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-gray-900 bg-opacity-90">
+          <div className="p-8 text-center text-white bg-gray-800 rounded-lg max-w-md">
+            <h2 className="mb-4 text-xl font-bold">Having trouble joining?</h2>
+            <p className="mb-6 text-gray-300">
+              You can join directly through Jitsi Meet:
+            </p>
+            <a
+              href={meetingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-6 py-3 mb-4 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Open in Jitsi Meet
+            </a>
+            <div className="mt-4">
+              <Button
+                variant="outline"
+                onClick={() => navigate("/")}
+                className="text-gray-300 border-gray-600"
+              >
+                Back to Home
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

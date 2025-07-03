@@ -1,0 +1,50 @@
+# Netlify Edge Functions for Jitsi Integration
+# This helps with CORS and iframe embedding issues
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+  
+[build.environment]
+  NODE_VERSION = "18"
+
+# Headers for all pages
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # Allow all camera and microphone access
+    Permissions-Policy = "camera=*, microphone=*, display-capture=*"
+
+# Special headers for meeting pages
+[[headers]]
+  for = "/meeting/*"
+  [headers.values]
+    # Allow iframe embedding
+    X-Frame-Options = "SAMEORIGIN"
+    # Very permissive CSP for Jitsi Meet
+    Content-Security-Policy = '''
+      default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;
+      script-src * 'unsafe-inline' 'unsafe-eval';
+      style-src * 'unsafe-inline';
+      img-src * data: blob:;
+      font-src * data:;
+      connect-src * wss: blob:;
+      media-src * blob: mediastream:;
+      frame-src *;
+      worker-src * blob:;
+      child-src * blob:;
+    '''
+
+# Redirect all routes to index.html for SPA
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Specific redirect for meeting URLs to ensure they work
+[[redirects]]
+  from = "/meeting/*"
+  to = "/index.html"
+  status = 200

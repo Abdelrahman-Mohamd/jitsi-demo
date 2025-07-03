@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
@@ -68,26 +68,39 @@ export const HomePage: React.FC = () => {
     setRoomNameError("");
   };
 
+  useEffect(() => {
+    // Debug info on page load
+    console.log("HomePage loaded");
+    console.log("Debug info:", {
+      isSecureContext: window.isSecureContext,
+      protocol: window.location.protocol,
+      hostname: window.location.hostname,
+      hasGetUserMedia: !!(
+        navigator.mediaDevices && navigator.mediaDevices.getUserMedia
+      ),
+    });
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-16">
+      <div className="container px-4 py-16 mx-auto">
         {/* Header */}
-        <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold text-gray-900 mb-4">
+        <div className="mb-16 text-center">
+          <h1 className="mb-4 text-5xl font-bold text-gray-900">
             Video Conference
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="max-w-2xl mx-auto text-xl text-gray-600">
             Connect with anyone, anywhere. Create or join secure video meetings
             with ease.
           </p>
         </div>
 
         {/* Main Card */}
-        <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-8">
+        <div className="max-w-md p-8 mx-auto bg-white shadow-xl rounded-2xl">
           <div className="space-y-6">
             {/* User Info Section */}
             <div>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-6 text-center">
+              <h2 className="mb-6 text-2xl font-semibold text-center text-gray-900">
                 Join a Meeting
               </h2>
 
@@ -114,7 +127,7 @@ export const HomePage: React.FC = () => {
             </div>
 
             {/* Meeting Actions */}
-            <div className="border-t pt-6">
+            <div className="pt-6 border-t">
               <div className="space-y-4">
                 {/* Create Meeting */}
                 <Button
@@ -146,7 +159,7 @@ export const HomePage: React.FC = () => {
                     <div className="w-full border-t border-gray-300" />
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white text-gray-500">or</span>
+                    <span className="px-2 text-gray-500 bg-white">or</span>
                   </div>
                 </div>
 
@@ -211,10 +224,10 @@ export const HomePage: React.FC = () => {
         </div>
 
         {/* Features */}
-        <div className="mt-16 max-w-4xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-8">
+        <div className="max-w-4xl mx-auto mt-16">
+          <div className="grid gap-8 md:grid-cols-3">
             <div className="text-center">
-              <div className="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full">
                 <svg
                   className="w-8 h-8 text-blue-600"
                   fill="none"
@@ -229,7 +242,7 @@ export const HomePage: React.FC = () => {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="mb-2 text-lg font-semibold text-gray-900">
                 HD Video & Audio
               </h3>
               <p className="text-gray-600">
@@ -238,7 +251,7 @@ export const HomePage: React.FC = () => {
             </div>
 
             <div className="text-center">
-              <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full">
                 <svg
                   className="w-8 h-8 text-green-600"
                   fill="none"
@@ -253,7 +266,7 @@ export const HomePage: React.FC = () => {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="mb-2 text-lg font-semibold text-gray-900">
                 Chat & Share
               </h3>
               <p className="text-gray-600">
@@ -262,7 +275,7 @@ export const HomePage: React.FC = () => {
             </div>
 
             <div className="text-center">
-              <div className="bg-purple-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-purple-100 rounded-full">
                 <svg
                   className="w-8 h-8 text-purple-600"
                   fill="none"
@@ -277,7 +290,7 @@ export const HomePage: React.FC = () => {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="mb-2 text-lg font-semibold text-gray-900">
                 Secure & Private
               </h3>
               <p className="text-gray-600">
