@@ -97,6 +97,14 @@ export const MeetingPage: React.FC = () => {
     }
 
     const initializeJitsi = async () => {
+      // Store container reference at the start to prevent it from being lost during re-renders
+      const containerElement = jitsiContainerRef.current || document.getElementById("jitsi-container") as HTMLDivElement;
+      
+      if (!containerElement) {
+        console.log("No container element found at initialization start");
+        return;
+      }
+
       try {
         console.log("Starting Jitsi initialization...");
         console.log("DOM debugging:", {
@@ -106,6 +114,7 @@ export const MeetingPage: React.FC = () => {
           documentReady: document.readyState,
         });
         
+        // Set these states after getting the container reference
         setIsInitialized(true);
         setLoading(true);
         setError(null);
@@ -119,36 +128,32 @@ export const MeetingPage: React.FC = () => {
         await loadJitsiScript();
         console.log("Jitsi script loaded successfully");
 
-        // Get container element (should be available since containerMounted is true)
-        let containerElement = jitsiContainerRef.current || document.getElementById("jitsi-container") as HTMLDivElement;
+        // Verify container is still available (use the stored reference)
+        const currentContainer = containerElement.isConnected 
+          ? containerElement 
+          : (jitsiContainerRef.current || document.getElementById("jitsi-container") as HTMLDivElement);
         
-        if (!containerElement) {
-          // Last resort - wait a bit more and try again
-          console.log("Container still not found, waiting additional time...");
-          await new Promise(resolve => setTimeout(resolve, 500));
-          containerElement = jitsiContainerRef.current || document.getElementById("jitsi-container") as HTMLDivElement;
-        }
-
-        if (!containerElement) {
-          throw new Error("Jitsi container not available despite containerMounted=true");
+        if (!currentContainer) {
+          throw new Error("Jitsi container lost during initialization");
         }
 
         console.log("Container found and ready:", {
+          storedContainer: !!containerElement,
+          storedConnected: containerElement.isConnected,
+          currentContainer: !!currentContainer,
           viaRef: !!jitsiContainerRef.current,
           viaId: !!document.getElementById("jitsi-container"),
-          element: !!containerElement,
-          containerMounted,
         });
 
         if (roomName) {
           console.log("Setting up Jitsi container...");
           // Clear any existing content
-          containerElement.innerHTML = "";
+          currentContainer.innerHTML = "";
 
           const config: JitsiConfig = {
             width: "100%",
             height: "100%",
-            parentNode: containerElement,
+            parentNode: currentContainer,
             roomName: roomName,
             configOverwrite: {
               startWithAudioMuted: !isHost,
@@ -188,7 +193,7 @@ export const MeetingPage: React.FC = () => {
 
           // Wait a moment and check if iframe was created
           setTimeout(() => {
-            const container = containerElement;
+            const container = currentContainer.isConnected ? currentContainer : document.getElementById("jitsi-container");
             const iframe = container?.querySelector("iframe");
             
             // Force iframe to take full size if it exists
@@ -307,8 +312,32 @@ export const MeetingPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-900">
-        <Loading message="Joining meeting..." />
+      <div className="relative min-h-screen bg-gray-900">
+        {/* Debug info overlay */}
+        <div className="absolute top-0 left-0 z-50 p-2 text-xs text-white bg-red-600 bg-opacity-75">
+          Debug: Container=LOADING, Init={isInitialized ? 'YES' : 'NO'}, Room={roomName || 'NONE'}
+        </div>
+        
+        {/* Jitsi Container - keep it mounted during loading */}
+        <div
+          id="jitsi-container"
+          ref={setJitsiContainerRef}
+          className="jitsi-container"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            zIndex: 999,
+            background: "#000",
+          }}
+        ></div>
+        
+        {/* Loading overlay */}
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-40">
+          <Loading message="Joining meeting..." />
+        </div>
       </div>
     );
   }
@@ -552,13 +581,6 @@ export const MeetingPage: React.FC = () => {
           </svg>
         )}
       </button>
-
-      {/* Loading overlay */}
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-40">
-          <Loading message="Joining meeting..." />
-        </div>
-      )}
 
       {/* Jitsi Container */}
       <div
