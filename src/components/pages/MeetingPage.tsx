@@ -89,6 +89,15 @@ export const MeetingPage: React.FC = () => {
         await loadJitsiScript();
         console.log("Jitsi script loaded successfully");
 
+        // Wait for container to be available
+        let retries = 0;
+        const maxRetries = 10;
+        while (!jitsiContainerRef.current && retries < maxRetries) {
+          console.log(`Waiting for container... attempt ${retries + 1}`);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          retries++;
+        }
+
         if (jitsiContainerRef.current && roomName) {
           console.log("Setting up Jitsi container...");
           // Clear any existing content
@@ -204,7 +213,10 @@ export const MeetingPage: React.FC = () => {
       }
     };
 
-    initializeJitsi();
+    // Add a small delay to ensure DOM is ready, especially for Netlify
+    setTimeout(() => {
+      initializeJitsi();
+    }, 100);
 
     return () => {
       if (jitsiApi) {
