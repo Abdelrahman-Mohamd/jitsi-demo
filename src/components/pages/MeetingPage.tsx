@@ -44,6 +44,7 @@ export const MeetingPage: React.FC = () => {
   const [showControls, setShowControls] = useState(true);
   const [copied, setCopied] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<string>("connecting");
 
   const isHost = searchParams.get("host") === "true" || userRole === "host";
 
@@ -109,6 +110,7 @@ export const MeetingPage: React.FC = () => {
 
       try {
         console.log("Starting Jitsi initialization...");
+        setConnectionStatus("initializing");
         console.log("DOM debugging:", {
           containerRef: !!jitsiContainerRef.current,
           containerById: !!document.getElementById("jitsi-container"),
@@ -127,6 +129,7 @@ export const MeetingPage: React.FC = () => {
         }
 
         console.log("Loading Jitsi script...");
+        setConnectionStatus("loading");
         await loadJitsiScript();
         console.log("Jitsi script loaded successfully");
 
@@ -166,6 +169,11 @@ export const MeetingPage: React.FC = () => {
               disableModeratorIndicator: false,
               startScreenSharing: false,
               enableEmailInStats: false,
+              // Simplified connection configuration
+              enableP2P: true,
+              p2p: {
+                enabled: true,
+              },
             },
             interfaceConfigOverwrite: {
               SHOW_JITSI_WATERMARK: false,
@@ -192,7 +200,34 @@ export const MeetingPage: React.FC = () => {
 
           console.log("Creating Jitsi API instance...");
           const api = new window.JitsiMeetExternalAPI("meet.jit.si", config);
-          setJitsiApi(api);          // Wait a moment and check if iframe was created
+          setJitsiApi(api);
+
+          // Add connection event listeners
+          api.addListener("connectionFailed", (error) => {
+            console.error("Jitsi connection failed:", error);
+            setConnectionStatus("failed");
+            setError("Failed to connect to the meeting. Please check your internet connection and try again.");
+          });
+
+          api.addListener("conferenceLeft", () => {
+            console.log("Conference left");
+            setConnectionStatus("disconnected");
+            setIsInMeeting(false);
+          });
+
+          api.addListener("conferenceJoined", () => {
+            console.log("Conference joined successfully");
+            setConnectionStatus("connected");
+            setIsInMeeting(true);
+            setError(null); // Clear any previous errors
+          });
+
+          api.addListener("readyToClose", () => {
+            console.log("Meeting ready to close");
+            setConnectionStatus("closing");
+            leaveMeeting();
+            navigate("/");
+          }); // Wait a moment and check if iframe was created
           setTimeout(() => {
             const container = currentContainer.isConnected
               ? currentContainer
@@ -219,7 +254,7 @@ export const MeetingPage: React.FC = () => {
               container.style.minWidth = "100vw";
               container.style.minHeight = "100vh";
             }
-            
+
             console.log("Iframe check:", {
               iframe: !!iframe,
               iframeSrc: iframe?.src || "none",
@@ -240,11 +275,6 @@ export const MeetingPage: React.FC = () => {
 
           console.log("Setting up event listeners...");
           // Event listeners
-          api.addListener("readyToClose", () => {
-            console.log("Meeting ready to close");
-            leaveMeeting();
-            navigate("/");
-          });
           api.addListener("participantJoined", () => {
             console.log("Participant joined");
             setParticipants((prev) => prev + 1);
@@ -376,7 +406,7 @@ export const MeetingPage: React.FC = () => {
       {/* Debug info overlay */}
       <div className="absolute top-0 left-0 z-50 p-2 text-xs text-white bg-red-600 bg-opacity-75">
         Debug: Container={containerMounted ? "YES" : "NO"}, Init=
-        {isInitialized ? "YES" : "NO"}, Room={roomName || "NONE"}
+        {isInitialized ? "YES" : "NO"}, Room={roomName || "NONE"}, Status={connectionStatus}
       </div>
 
       {/* Meeting Info Bar */}

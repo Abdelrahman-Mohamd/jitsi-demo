@@ -37,6 +37,25 @@ export interface JitsiConfig {
     disableModeratorIndicator?: boolean;
     startScreenSharing?: boolean;
     enableEmailInStats?: boolean;
+    // Network and connection configuration
+    useStunTurn?: boolean;
+    enableP2P?: boolean;
+    p2p?: {
+      enabled?: boolean;
+      preferH264?: boolean;
+      disableH264?: boolean;
+      useStunTurn?: boolean;
+    };
+    iceServers?: Array<{
+      urls: string | string[];
+      username?: string;
+      credential?: string;
+    }>;
+    enableLayerSuspension?: boolean;
+    disableRtx?: boolean;
+    enableTcc?: boolean;
+    enableRemb?: boolean;
+    openBridgeChannel?: boolean;
   };
   interfaceConfigOverwrite?: {
     TOOLBAR_BUTTONS?: string[];
