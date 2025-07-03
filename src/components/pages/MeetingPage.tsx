@@ -98,8 +98,10 @@ export const MeetingPage: React.FC = () => {
 
     const initializeJitsi = async () => {
       // Store container reference at the start to prevent it from being lost during re-renders
-      const containerElement = jitsiContainerRef.current || document.getElementById("jitsi-container") as HTMLDivElement;
-      
+      const containerElement =
+        jitsiContainerRef.current ||
+        (document.getElementById("jitsi-container") as HTMLDivElement);
+
       if (!containerElement) {
         console.log("No container element found at initialization start");
         return;
@@ -113,7 +115,7 @@ export const MeetingPage: React.FC = () => {
           bodyChildren: document.body.children.length,
           documentReady: document.readyState,
         });
-        
+
         // Set these states after getting the container reference
         setIsInitialized(true);
         setLoading(true);
@@ -129,10 +131,11 @@ export const MeetingPage: React.FC = () => {
         console.log("Jitsi script loaded successfully");
 
         // Verify container is still available (use the stored reference)
-        const currentContainer = containerElement.isConnected 
-          ? containerElement 
-          : (jitsiContainerRef.current || document.getElementById("jitsi-container") as HTMLDivElement);
-        
+        const currentContainer = containerElement.isConnected
+          ? containerElement
+          : jitsiContainerRef.current ||
+            (document.getElementById("jitsi-container") as HTMLDivElement);
+
         if (!currentContainer) {
           throw new Error("Jitsi container lost during initialization");
         }
@@ -189,21 +192,32 @@ export const MeetingPage: React.FC = () => {
 
           console.log("Creating Jitsi API instance...");
           const api = new window.JitsiMeetExternalAPI("meet.jit.si", config);
-          setJitsiApi(api);
-
-          // Wait a moment and check if iframe was created
+          setJitsiApi(api);          // Wait a moment and check if iframe was created
           setTimeout(() => {
-            const container = currentContainer.isConnected ? currentContainer : document.getElementById("jitsi-container");
+            const container = currentContainer.isConnected
+              ? currentContainer
+              : document.getElementById("jitsi-container");
             const iframe = container?.querySelector("iframe");
-            
+
             // Force iframe to take full size if it exists
             if (iframe) {
-              iframe.style.width = "100%";
-              iframe.style.height = "100%";
+              iframe.style.width = "100vw";
+              iframe.style.height = "100vh";
               iframe.style.border = "none";
-              iframe.style.position = "absolute";
+              iframe.style.position = "fixed";
               iframe.style.top = "0";
               iframe.style.left = "0";
+              iframe.style.zIndex = "1";
+              iframe.style.minWidth = "100vw";
+              iframe.style.minHeight = "100vh";
+            }
+
+            // Also ensure container has proper dimensions
+            if (container) {
+              container.style.width = "100vw";
+              container.style.height = "100vh";
+              container.style.minWidth = "100vw";
+              container.style.minHeight = "100vh";
             }
             
             console.log("Iframe check:", {
@@ -315,9 +329,10 @@ export const MeetingPage: React.FC = () => {
       <div className="relative min-h-screen bg-gray-900">
         {/* Debug info overlay */}
         <div className="absolute top-0 left-0 z-50 p-2 text-xs text-white bg-red-600 bg-opacity-75">
-          Debug: Container=LOADING, Init={isInitialized ? 'YES' : 'NO'}, Room={roomName || 'NONE'}
+          Debug: Container=LOADING, Init={isInitialized ? "YES" : "NO"}, Room=
+          {roomName || "NONE"}
         </div>
-        
+
         {/* Jitsi Container - keep it mounted during loading */}
         <div
           id="jitsi-container"
@@ -329,13 +344,15 @@ export const MeetingPage: React.FC = () => {
             left: 0,
             width: "100vw",
             height: "100vh",
-            zIndex: 999,
+            zIndex: 1,
             background: "#000",
+            minHeight: "100vh",
+            minWidth: "100vw",
           }}
         ></div>
-        
+
         {/* Loading overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-40">
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-gray-900">
           <Loading message="Joining meeting..." />
         </div>
       </div>
@@ -358,7 +375,8 @@ export const MeetingPage: React.FC = () => {
     <div className="relative min-h-screen bg-gray-900">
       {/* Debug info overlay */}
       <div className="absolute top-0 left-0 z-50 p-2 text-xs text-white bg-red-600 bg-opacity-75">
-        Debug: Container={containerMounted ? 'YES' : 'NO'}, Init={isInitialized ? 'YES' : 'NO'}, Room={roomName || 'NONE'}
+        Debug: Container={containerMounted ? "YES" : "NO"}, Init=
+        {isInitialized ? "YES" : "NO"}, Room={roomName || "NONE"}
       </div>
 
       {/* Meeting Info Bar */}
@@ -593,8 +611,10 @@ export const MeetingPage: React.FC = () => {
           left: 0,
           width: "100vw",
           height: "100vh",
-          zIndex: 999,
+          zIndex: 1,
           background: "#000",
+          minHeight: "100vh",
+          minWidth: "100vw",
         }}
         onLoad={() => console.log("Jitsi container loaded")}
       ></div>
@@ -602,7 +622,7 @@ export const MeetingPage: React.FC = () => {
       {/* Fallback: Show direct Jitsi link if initialization fails */}
       {error && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-gray-900 bg-opacity-90">
-          <div className="p-8 text-center text-white bg-gray-800 rounded-lg max-w-md">
+          <div className="max-w-md p-8 text-center text-white bg-gray-800 rounded-lg">
             <h2 className="mb-4 text-xl font-bold">Having trouble joining?</h2>
             <p className="mb-6 text-gray-300">
               You can join directly through Jitsi Meet:
@@ -611,7 +631,7 @@ export const MeetingPage: React.FC = () => {
               href={meetingUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block px-6 py-3 mb-4 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-block px-6 py-3 mb-4 text-white transition-colors bg-blue-600 rounded-lg hover:bg-blue-700"
             >
               Open in Jitsi Meet
             </a>
