@@ -285,6 +285,29 @@ export const MeetingPage: React.FC = () => {
             setConnectionStatus("connected");
             setIsInMeeting(true);
             setError(null); // Clear any previous errors
+            
+            // Add additional video forcing after conference joins
+            setTimeout(() => {
+              const container = document.getElementById("jitsi-container");
+              const iframe = container?.querySelector("iframe");
+              
+              if (iframe) {
+                console.log("Re-forcing iframe video visibility after conference join...");
+                iframe.style.cssText = `
+                  width: 100vw !important;
+                  height: 100vh !important;
+                  border: none !important;
+                  position: fixed !important;
+                  top: 0 !important;
+                  left: 0 !important;
+                  z-index: 1000 !important;
+                  display: block !important;
+                  visibility: visible !important;
+                  opacity: 1 !important;
+                  background: #000 !important;
+                `;
+              }
+            }, 1000);
           });
 
           api.addListener("readyToClose", () => {
@@ -301,23 +324,57 @@ export const MeetingPage: React.FC = () => {
 
             // Force iframe to take full size if it exists
             if (iframe) {
-              iframe.style.width = "100vw";
-              iframe.style.height = "100vh";
-              iframe.style.border = "none";
-              iframe.style.position = "fixed";
-              iframe.style.top = "0";
-              iframe.style.left = "0";
-              iframe.style.zIndex = "1";
-              iframe.style.minWidth = "100vw";
-              iframe.style.minHeight = "100vh";
+              // More aggressive iframe styling
+              iframe.style.cssText = `
+                width: 100vw !important;
+                height: 100vh !important;
+                border: none !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                z-index: 1 !important;
+                min-width: 100vw !important;
+                min-height: 100vh !important;
+                max-width: 100vw !important;
+                max-height: 100vh !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                background: #000 !important;
+              `;
+              
+              // Also force any nested elements to be visible
+              const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+              if (iframeDoc) {
+                const style = iframeDoc.createElement('style');
+                style.textContent = `
+                  body { margin: 0 !important; padding: 0 !important; }
+                  .videocontainer, .filmstrip, .large-video-container { 
+                    display: block !important; 
+                    visibility: visible !important; 
+                    opacity: 1 !important;
+                  }
+                `;
+                iframeDoc.head.appendChild(style);
+              }
             }
 
             // Also ensure container has proper dimensions
             if (container) {
-              container.style.width = "100vw";
-              container.style.height = "100vh";
-              container.style.minWidth = "100vw";
-              container.style.minHeight = "100vh";
+              container.style.cssText = `
+                width: 100vw !important;
+                height: 100vh !important;
+                min-width: 100vw !important;
+                min-height: 100vh !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                z-index: 1 !important;
+                background: #000 !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+              `;
             }
 
             console.log("Iframe check:", {
@@ -330,6 +387,8 @@ export const MeetingPage: React.FC = () => {
                     display: iframe.style.display,
                     position: iframe.style.position,
                     zIndex: iframe.style.zIndex,
+                    visibility: iframe.style.visibility,
+                    opacity: iframe.style.opacity,
                   }
                 : "none",
               containerChildren: container?.children.length,
@@ -337,6 +396,32 @@ export const MeetingPage: React.FC = () => {
               containerHTML: container?.innerHTML.substring(0, 200),
             });
           }, 1000);
+
+          // Add a recurring check to force iframe visibility
+          const intervalId = setInterval(() => {
+            const container = document.getElementById("jitsi-container");
+            const iframe = container?.querySelector("iframe");
+            
+            if (iframe && iframe.style.width !== "100vw") {
+              console.log("Re-applying iframe styles...");
+              iframe.style.cssText = `
+                width: 100vw !important;
+                height: 100vh !important;
+                border: none !important;
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                z-index: 1 !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                background: #000 !important;
+              `;
+            }
+          }, 2000);
+
+          // Clear interval when component unmounts
+          return () => clearInterval(intervalId);
 
           console.log("Setting up event listeners...");
           // Event listeners
@@ -351,6 +436,81 @@ export const MeetingPage: React.FC = () => {
           api.addListener("videoConferenceJoined", () => {
             console.log("Video conference joined");
             setParticipants(1); // Include self
+            
+            // Force iframe video elements to be visible after joining
+            setTimeout(() => {
+              const container = document.getElementById("jitsi-container");
+              const iframe = container?.querySelector("iframe");
+              
+              if (iframe) {
+                try {
+                  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                  if (iframeDoc) {
+                    console.log("Injecting video visibility CSS into iframe...");
+                    
+                    // Remove any existing injected styles
+                    const existingStyle = iframeDoc.getElementById('forced-video-styles');
+                    if (existingStyle) {
+                      existingStyle.remove();
+                    }
+                    
+                    // Inject new styles
+                    const style = iframeDoc.createElement('style');
+                    style.id = 'forced-video-styles';
+                    style.textContent = `
+                      /* Force all video elements to be visible */
+                      video {
+                        display: block !important;
+                        visibility: visible !important;
+                        opacity: 1 !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                        object-fit: cover !important;
+                        background: #000 !important;
+                      }
+                      
+                      /* Force video containers to be visible */
+                      .videocontainer,
+                      .large-video-container,
+                      .filmstrip,
+                      .large-video,
+                      #largeVideoContainer,
+                      #dominantSpeaker,
+                      .dominant-speaker {
+                        display: block !important;
+                        visibility: visible !important;
+                        opacity: 1 !important;
+                        position: relative !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                        background: #000 !important;
+                      }
+                      
+                      /* Force body to be full size */
+                      body {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        width: 100vw !important;
+                        height: 100vh !important;
+                        overflow: hidden !important;
+                        background: #000 !important;
+                      }
+                      
+                      /* Hide UI elements that might block video */
+                      .welcome-page,
+                      .prejoin-screen {
+                        display: none !important;
+                      }
+                    `;
+                    
+                    iframeDoc.head.appendChild(style);
+                    console.log("CSS injected successfully");
+                  }
+                } catch (error) {
+                  console.error("Failed to inject CSS into iframe:", error);
+                }
+              }
+            }, 2000);
           });
           api.addListener("videoConferenceLeft", () => {
             console.log("Video conference left");

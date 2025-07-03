@@ -23,6 +23,35 @@ iframe[name*="jitsiConferenceFrame"] {
   background: #000 !important;
   margin: 0 !important;
   padding: 0 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Force all video elements to be visible */
+iframe video,
+iframe[src*="jitsi"] video,
+iframe[src*="meet.jit.si"] video {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* Force Jitsi video containers to be visible */
+iframe .videocontainer,
+iframe .large-video-container,
+iframe .filmstrip,
+iframe .large-video,
+iframe #largeVideoContainer,
+iframe #dominantSpeaker {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* Ensure the Jitsi container is properly positioned */
@@ -34,6 +63,7 @@ iframe[name*="jitsiConferenceFrame"] {
   height: 100vh !important;
   overflow: hidden !important;
   z-index: 999 !important;
+  background: #000 !important;
 }
 
 /* Fallback styles in case Tailwind isn't loading */
