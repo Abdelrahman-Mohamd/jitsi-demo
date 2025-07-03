@@ -11,6 +11,7 @@ interface AppState {
   currentMeeting: Meeting | null;
   isInMeeting: boolean;
   jitsiApi: JitsiAPI | null;
+  currentJitsiServer: string;
 
   // UI state
   isLoading: boolean;
@@ -19,6 +20,7 @@ interface AppState {
   isScreenSharing: boolean;
   isAudioMuted: boolean;
   isVideoMuted: boolean;
+  showServerSelection: boolean;
 
   // Actions
   setUserRole: (role: UserRole) => void;
@@ -26,8 +28,10 @@ interface AppState {
   setCurrentMeeting: (meeting: Meeting | null) => void;
   setJitsiApi: (api: JitsiAPI | null) => void;
   setIsInMeeting: (inMeeting: boolean) => void;
+  setCurrentJitsiServer: (server: string) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  setShowServerSelection: (show: boolean) => void;
   toggleChat: () => void;
   toggleScreenSharing: () => void;
   toggleAudio: () => void;
@@ -44,12 +48,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentMeeting: null,
   isInMeeting: false,
   jitsiApi: null,
+  currentJitsiServer: "meet.jit.si",
   isLoading: false,
   error: null,
   isChatOpen: false,
   isScreenSharing: false,
   isAudioMuted: false,
   isVideoMuted: false,
+  showServerSelection: false,
 
   // Actions
   setUserRole: (role) => set({ userRole: role }),
@@ -62,9 +68,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setIsInMeeting: (inMeeting) => set({ isInMeeting: inMeeting }),
 
+  setCurrentJitsiServer: (server) => set({ currentJitsiServer: server }),
+
   setLoading: (loading) => set({ isLoading: loading }),
 
   setError: (error) => set({ error }),
+
+  setShowServerSelection: (show) => set({ showServerSelection: show }),
 
   toggleChat: () => {
     const { jitsiApi } = get();
@@ -122,11 +132,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       currentMeeting: null,
       isInMeeting: false,
       jitsiApi: null,
+      currentJitsiServer: "meet.jit.si",
       isLoading: false,
       error: null,
       isChatOpen: false,
       isScreenSharing: false,
       isAudioMuted: false,
       isVideoMuted: false,
+      showServerSelection: false,
     }),
 }));

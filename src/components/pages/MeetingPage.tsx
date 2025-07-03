@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "../ui/Button";
 import { Loading } from "../ui/Loading";
+import { ServerSelector } from "../ui/ServerSelector";
 import { useAppStore } from "../../store/appStore";
 import {
   loadJitsiScript,
@@ -39,6 +40,10 @@ export const MeetingPage: React.FC = () => {
     toggleScreenSharing,
     toggleAudio,
     toggleVideo,
+    currentJitsiServer,
+    setCurrentJitsiServer,
+    showServerSelection,
+    setShowServerSelection,
   } = useAppStore();
 
   const [participants, setParticipants] = useState(0);
@@ -84,9 +89,9 @@ export const MeetingPage: React.FC = () => {
       return;
     }
 
-    const url = getMeetingUrl(roomName);
+    const url = getMeetingUrl(roomName, currentJitsiServer);
     setMeetingUrl(url);
-  }, [roomName, userName, navigate]);
+  }, [roomName, userName, navigate, currentJitsiServer]);
 
   // Separate effect for Jitsi initialization that waits for container
   useEffect(() => {
@@ -131,9 +136,9 @@ export const MeetingPage: React.FC = () => {
           throw new Error("HTTPS is required for camera and microphone access");
         }
 
-        console.log("Loading Jitsi script...");
+        console.log(`Loading Jitsi script for ${currentJitsiServer}...`);
         setConnectionStatus("loading");
-        await loadJitsiScript();
+        await loadJitsiScript(currentJitsiServer);
         console.log("Jitsi script loaded successfully");
 
         // Verify container is still available (use the stored reference)
@@ -160,41 +165,31 @@ export const MeetingPage: React.FC = () => {
           currentContainer.innerHTML = "";
 
           // Generate JWT token for authentication
-          const jwtToken = generateJitsiJWT(roomName, userName || "Guest", isHost);
+          const jwtToken = generateJitsiJWT(
+            roomName,
+            userName || "Guest",
+            isHost
+          );
 
           const config: JitsiConfig = {
             width: "100%",
             height: "100%",
             parentNode: currentContainer,
             roomName: roomName,
-            // Try without JWT first
-            // jwt: jwtToken,
+            // Use JWT token to authenticate as moderator
+            jwt: jwtToken,
             configOverwrite: {
               startWithAudioMuted: !isHost,
               startWithVideoMuted: false,
               enableWelcomePage: false,
               prejoinPageEnabled: false,
-              disableModeratorIndicator: true, // Force disable moderator indicators
               startScreenSharing: false,
               enableEmailInStats: false,
-              // Simplified connection configuration
+              // Basic P2P configuration
               enableP2P: true,
-              p2p: {
-                enabled: true,
-              },
-              // Disable lobby and moderation
+              // Minimal lobby configuration
               enableLobby: false,
-              enableLobbyChat: false,
-              enableSecurityDialogPassword: false,
               requireDisplayName: false,
-              enableUserRolesBasedOnToken: false,
-              enableAutomaticUrlDisplay: false,
-              // Room access settings
-              enableInsecureRoomNameWarning: false,
-              enableClosePage: false,
-              // Auto-join settings
-              autoKnockLobby: false,
-              hideConferenceSubject: false,
             },
             interfaceConfigOverwrite: {
               SHOW_JITSI_WATERMARK: false,
@@ -222,56 +217,61 @@ export const MeetingPage: React.FC = () => {
           console.log("Creating Jitsi API instance...");
           console.log("Room name:", roomName);
           console.log("User:", userName, "Is host:", isHost);
-          console.log("JWT token generated:", jwtToken.substring(0, 50) + "...");
-          
-          // Try using meet.jit.si
-          const api = new window.JitsiMeetExternalAPI("meet.jit.si", config);
+          console.log("Server:", currentJitsiServer);
+          console.log(
+            "JWT token generated:",
+            jwtToken.substring(0, 50) + "..."
+          );
+
+          // Use the current selected server
+          const api = new window.JitsiMeetExternalAPI(currentJitsiServer, config);
           setJitsiApi(api);
 
           // Add connection event listeners
           api.addListener("connectionFailed", (error) => {
             console.error("Jitsi connection failed:", error);
-            
-            // Check if it's a membersOnly error and try to bypass
-            if (error && typeof error === 'object' && 'name' in error && 
-                (error as { name: string }).name === "conference.connectionError.membersOnly") {
-              console.log("Detected membersOnly error, attempting to bypass...");
-              
-              // Try to execute commands to bypass lobby
-              try {
-                api.executeCommand("toggleLobby");
-                api.executeCommand("approveParticipant");
-                
-                // Also try to set the user as moderator
-                setTimeout(() => {
-                  api.executeCommand("grantModerator");
-                }, 1000);
-                
-                return; // Don't set error state yet
-              } catch (cmdError) {
-                console.error("Failed to execute bypass commands:", cmdError);
-              }
+
+            // Check if it's a membersOnly error and show server selection
+            if (
+              error &&
+              typeof error === "object" &&
+              "name" in error &&
+              (error as { name: string }).name ===
+                "conference.connectionError.membersOnly"
+            ) {
+              console.log(
+                "Detected membersOnly error, showing server selection..."
+              );
+              setConnectionStatus("failed");
+              setShowServerSelection(true);
+              setError(
+                `Connection failed on ${currentJitsiServer}. This server has waiting rooms enabled. Try an alternative server or ask the host to disable the waiting room.`
+              );
+              return; // Don't set generic error
             }
-            
+
             setConnectionStatus("failed");
             setError(
-              "Failed to connect to the meeting. The room might require approval from a moderator. Please try again or ask the host to disable the waiting room."
+              `Failed to connect to ${currentJitsiServer}. Please try again or select a different server.`
             );
           });
 
           // Add specific listener for conference errors
           api.addListener("conferenceError", (error) => {
             console.error("Conference error:", error);
-            
-            if (error && typeof error === 'object' && 'name' in error && 
-                (error as { name: string }).name === "conference.connectionError.membersOnly") {
+
+            if (
+              error &&
+              typeof error === "object" &&
+              "name" in error &&
+              (error as { name: string }).name ===
+                "conference.connectionError.membersOnly"
+            ) {
               console.log("Conference membersOnly error detected");
-              // Don't immediately fail, give some time for other mechanisms to work
-              setTimeout(() => {
-                setError(
-                  "This meeting room has a waiting room enabled. Please wait for the host to admit you, or ask them to disable the waiting room feature."
-                );
-              }, 5000);
+              setShowServerSelection(true);
+              setError(
+                `Waiting room is enabled on ${currentJitsiServer}. Please try an alternative server or ask the host to admit you.`
+              );
             }
           });
 
@@ -286,14 +286,16 @@ export const MeetingPage: React.FC = () => {
             setConnectionStatus("connected");
             setIsInMeeting(true);
             setError(null); // Clear any previous errors
-            
+
             // Add additional video forcing after conference joins
             setTimeout(() => {
               const container = document.getElementById("jitsi-container");
               const iframe = container?.querySelector("iframe");
-              
+
               if (iframe) {
-                console.log("Re-forcing iframe video visibility after conference join...");
+                console.log(
+                  "Re-forcing iframe video visibility after conference join..."
+                );
                 iframe.style.cssText = `
                   width: 100vw !important;
                   height: 100vh !important;
@@ -343,11 +345,12 @@ export const MeetingPage: React.FC = () => {
                 opacity: 1 !important;
                 background: #000 !important;
               `;
-              
+
               // Also force any nested elements to be visible
-              const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+              const iframeDoc =
+                iframe.contentDocument || iframe.contentWindow?.document;
               if (iframeDoc) {
-                const style = iframeDoc.createElement('style');
+                const style = iframeDoc.createElement("style");
                 style.textContent = `
                   body { margin: 0 !important; padding: 0 !important; }
                   .videocontainer, .filmstrip, .large-video-container { 
@@ -402,7 +405,7 @@ export const MeetingPage: React.FC = () => {
           intervalRef.current = setInterval(() => {
             const container = document.getElementById("jitsi-container");
             const iframe = container?.querySelector("iframe");
-            
+
             if (iframe && iframe.style.width !== "100vw") {
               console.log("Re-applying iframe styles...");
               iframe.style.cssText = `
@@ -419,15 +422,16 @@ export const MeetingPage: React.FC = () => {
                 background: #000 !important;
               `;
             }
-            
+
             // Also try to force video elements to be visible
             if (iframe) {
               try {
-                const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                const iframeDoc =
+                  iframe.contentDocument || iframe.contentWindow?.document;
                 if (iframeDoc) {
                   // Force all video elements to be visible
-                  const videos = iframeDoc.querySelectorAll('video');
-                  videos.forEach(video => {
+                  const videos = iframeDoc.querySelectorAll("video");
+                  videos.forEach((video) => {
                     video.style.cssText = `
                       display: block !important;
                       visibility: visible !important;
@@ -437,10 +441,12 @@ export const MeetingPage: React.FC = () => {
                       object-fit: cover !important;
                     `;
                   });
-                  
+
                   // Force video containers to be visible
-                  const containers = iframeDoc.querySelectorAll('.videocontainer, .large-video-container, .filmstrip, .large-video, #largeVideoContainer, #dominantSpeaker');
-                  containers.forEach(container => {
+                  const containers = iframeDoc.querySelectorAll(
+                    ".videocontainer, .large-video-container, .filmstrip, .large-video, #largeVideoContainer, #dominantSpeaker"
+                  );
+                  containers.forEach((container) => {
                     (container as HTMLElement).style.cssText = `
                       display: block !important;
                       visibility: visible !important;
@@ -469,27 +475,32 @@ export const MeetingPage: React.FC = () => {
           api.addListener("videoConferenceJoined", () => {
             console.log("Video conference joined");
             setParticipants(1); // Include self
-            
+
             // Force iframe video elements to be visible after joining
             setTimeout(() => {
               const container = document.getElementById("jitsi-container");
               const iframe = container?.querySelector("iframe");
-              
+
               if (iframe) {
                 try {
-                  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                  const iframeDoc =
+                    iframe.contentDocument || iframe.contentWindow?.document;
                   if (iframeDoc) {
-                    console.log("Injecting video visibility CSS into iframe...");
-                    
+                    console.log(
+                      "Injecting video visibility CSS into iframe..."
+                    );
+
                     // Remove any existing injected styles
-                    const existingStyle = iframeDoc.getElementById('forced-video-styles');
+                    const existingStyle = iframeDoc.getElementById(
+                      "forced-video-styles"
+                    );
                     if (existingStyle) {
                       existingStyle.remove();
                     }
-                    
+
                     // Inject new styles
-                    const style = iframeDoc.createElement('style');
-                    style.id = 'forced-video-styles';
+                    const style = iframeDoc.createElement("style");
+                    style.id = "forced-video-styles";
                     style.textContent = `
                       /* Force all video elements to be visible */
                       video {
@@ -535,7 +546,7 @@ export const MeetingPage: React.FC = () => {
                         display: none !important;
                       }
                     `;
-                    
+
                     iframeDoc.head.appendChild(style);
                     console.log("CSS injected successfully");
                   }
@@ -596,6 +607,8 @@ export const MeetingPage: React.FC = () => {
     isInitialized,
     navigate,
     containerMounted,
+    currentJitsiServer,
+    setShowServerSelection,
   ]);
 
   const handleLeaveMeeting = () => {
@@ -613,6 +626,28 @@ export const MeetingPage: React.FC = () => {
 
   const toggleControlsVisibility = () => {
     setShowControls((prev) => !prev);
+  };
+
+  const handleServerSelect = (server: string) => {
+    console.log(`Switching to server: ${server}`);
+    setCurrentJitsiServer(server);
+    setShowServerSelection(false);
+    setError(null);
+    setIsInitialized(false); // This will trigger a re-initialization
+    setConnectionStatus("connecting");
+  };
+
+  const handleRetryConnection = () => {
+    console.log("Retrying connection...");
+    setShowServerSelection(false);
+    setError(null);
+    setIsInitialized(false); // This will trigger a re-initialization
+    setConnectionStatus("connecting");
+  };
+
+  const handleCloseServerSelection = () => {
+    setShowServerSelection(false);
+    navigate("/");
   };
 
   if (isLoading) {
@@ -668,7 +703,7 @@ export const MeetingPage: React.FC = () => {
       <div className="absolute top-0 left-0 z-50 p-2 text-xs text-white bg-red-600 bg-opacity-75">
         Debug: Container={containerMounted ? "YES" : "NO"}, Init=
         {isInitialized ? "YES" : "NO"}, Room={roomName || "NONE"}, Status=
-        {connectionStatus}
+        {connectionStatus}, Server={currentJitsiServer}
       </div>
 
       {/* Meeting Info Bar */}
@@ -911,38 +946,51 @@ export const MeetingPage: React.FC = () => {
         onLoad={() => console.log("Jitsi container loaded")}
       ></div>
 
+      {/* Server Selection Modal */}
+      {showServerSelection && (
+        <ServerSelector
+          currentServer={currentJitsiServer}
+          onServerSelect={handleServerSelect}
+          onRetry={handleRetryConnection}
+          onClose={handleCloseServerSelection}
+        />
+      )}
+
       {/* Fallback: Show direct Jitsi link if initialization fails */}
-      {error && (
+      {error && !showServerSelection && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-gray-900 bg-opacity-90">
           <div className="max-w-md p-8 text-center text-white bg-gray-800 rounded-lg">
             <h2 className="mb-4 text-xl font-bold">Unable to join meeting</h2>
             <p className="mb-4 text-gray-300">{error}</p>
+
+            <div className="mb-6 text-sm text-gray-400">
+              <p className="mb-2">You can try:</p>
+              <ul className="text-left list-disc list-inside">
+                <li>Using a different Jitsi server</li>
+                <li>Joining directly through Jitsi Meet</li>
+                <li>Asking the host to disable waiting rooms</li>
+              </ul>
+            </div>
+
+            <div className="space-y-3 mb-4">
+              <Button
+                onClick={() => setShowServerSelection(true)}
+                className="w-full"
+                variant="primary"
+              >
+                Try Different Server
+              </Button>
+              
+              <a
+                href={meetingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full px-6 py-3 text-center text-white transition-colors bg-blue-600 rounded-lg hover:bg-blue-700"
+              >
+                Open in Jitsi Meet ({currentJitsiServer})
+              </a>
+            </div>
             
-            {error.includes("waiting room") || error.includes("lobby") ? (
-              <div className="mb-6 text-sm text-gray-400">
-                <p className="mb-2">
-                  The meeting room has a waiting room enabled. You can:
-                </p>
-                <ul className="text-left list-disc list-inside">
-                  <li>Wait for the host to admit you</li>
-                  <li>Ask the host to disable the waiting room</li>
-                  <li>Join directly through Jitsi Meet</li>
-                </ul>
-              </div>
-            ) : (
-              <p className="mb-6 text-gray-300">
-                You can try joining directly through Jitsi Meet:
-              </p>
-            )}
-            
-            <a
-              href={meetingUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block px-6 py-3 mb-4 text-white transition-colors bg-blue-600 rounded-lg hover:bg-blue-700"
-            >
-              Open in Jitsi Meet
-            </a>
             <div className="mt-4">
               <Button
                 variant="outline"
