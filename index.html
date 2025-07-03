@@ -3,12 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Video Conference" />
     <title>Video Conference - Powered by Jitsi</title>
     <meta
       name="description"
       content="Secure video conferencing with high-quality audio and video calls"
     />
+
+    <!-- Preconnect to Jitsi servers for better performance -->
+    <link rel="preconnect" href="https://meet.jit.si" />
+    <link rel="dns-prefetch" href="https://meet.jit.si" />
   </head>
   <body>
     <div id="root"></div>

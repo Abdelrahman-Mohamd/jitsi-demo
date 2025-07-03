@@ -88,6 +88,7 @@ export const loadJitsiScript = (): Promise<void> => {
     const script = document.createElement("script");
     script.src = "https://meet.jit.si/external_api.js";
     script.async = true;
+    script.crossOrigin = "anonymous";
 
     script.onload = () => {
       // Wait a bit for the API to be fully loaded

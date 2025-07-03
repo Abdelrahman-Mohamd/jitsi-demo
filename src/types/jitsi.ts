@@ -54,6 +54,10 @@ export interface JitsiConfig {
     SHOW_CHROME_EXTENSION_BANNER?: boolean;
     filmStripOnly?: boolean;
     HIDE_INVITE_MORE_HEADER?: boolean;
+    MOBILE_APP_PROMO?: boolean;
+    NATIVE_APP_NAME?: string;
+    PROVIDER_NAME?: string;
+    SHOW_DEEP_LINKING_IMAGE?: boolean;
   };
   onload?: () => void;
   invitees?: Array<{ id: string; avatar: string; name: string; email: string }>;

@@ -133,6 +133,10 @@ export const MeetingPage: React.FC = () => {
             SHOW_CHROME_EXTENSION_BANNER: false,
             DEFAULT_REMOTE_DISPLAY_NAME: "Participant",
             DEFAULT_LOCAL_DISPLAY_NAME: userName || "You",
+            MOBILE_APP_PROMO: false,
+            NATIVE_APP_NAME: "Video Conference",
+            PROVIDER_NAME: "Video Conference",
+            SHOW_DEEP_LINKING_IMAGE: false,
           },
           userInfo: {
             displayName: userName,
@@ -200,7 +204,7 @@ export const MeetingPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
         <Loading message="Joining meeting..." />
       </div>
     );
@@ -208,9 +212,9 @@ export const MeetingPage: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
         <div className="text-center text-white">
-          <h1 className="text-2xl font-bold mb-4">Unable to join meeting</h1>
+          <h1 className="mb-4 text-2xl font-bold">Unable to join meeting</h1>
           <p className="mb-6">{error}</p>
           <Button onClick={() => navigate("/")}>Return to Home</Button>
         </div>
@@ -219,23 +223,23 @@ export const MeetingPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 relative">
+    <div className="relative min-h-screen bg-gray-900">
       {/* Meeting Info Bar */}
       {showControls && (
-        <div className="absolute top-0 left-0 right-0 z-10 bg-black bg-opacity-50 text-white p-4">
-          <div className="flex items-center justify-between max-w-7xl mx-auto">
+        <div className="absolute top-0 left-0 right-0 z-10 p-4 text-white bg-black bg-opacity-50">
+          <div className="flex items-center justify-between mx-auto max-w-7xl">
             <div className="flex items-center space-x-4">
               <h1 className="text-lg font-semibold">
                 {roomName}
                 {isHost && (
-                  <span className="ml-2 px-2 py-1 bg-blue-600 text-xs rounded">
+                  <span className="px-2 py-1 ml-2 text-xs bg-blue-600 rounded">
                     HOST
                   </span>
                 )}
               </h1>
               <div className="flex items-center space-x-2 text-sm">
                 <span className="flex items-center">
-                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                  <div className="w-2 h-2 mr-2 bg-green-400 rounded-full"></div>
                   {participants} participant{participants !== 1 ? "s" : ""}
                 </span>
               </div>
@@ -261,8 +265,8 @@ export const MeetingPage: React.FC = () => {
 
       {/* Custom Controls */}
       {showControls && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10">
-          <div className="flex items-center space-x-2 bg-black bg-opacity-75 rounded-lg p-2">
+        <div className="absolute z-10 transform -translate-x-1/2 bottom-4 left-1/2">
+          <div className="flex items-center p-2 space-x-2 bg-black bg-opacity-75 rounded-lg">
             <Button
               variant={isAudioMuted ? "danger" : "secondary"}
               size="sm"
@@ -401,7 +405,7 @@ export const MeetingPage: React.FC = () => {
       {/* Hide/Show Controls Button */}
       <button
         onClick={toggleControlsVisibility}
-        className="absolute top-4 right-4 z-20 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-opacity"
+        className="absolute z-20 p-2 text-white transition-opacity bg-black bg-opacity-50 rounded-full top-4 right-4 hover:bg-opacity-75"
         title={showControls ? "Hide controls" : "Show controls"}
       >
         {showControls ? (
