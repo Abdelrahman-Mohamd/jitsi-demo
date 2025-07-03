@@ -15,6 +15,7 @@ export const MeetingPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const jitsiContainerRef = useRef<HTMLDivElement>(null);
+  const [containerMounted, setContainerMounted] = useState(false);
 
   const {
     userName,
@@ -46,6 +47,28 @@ export const MeetingPage: React.FC = () => {
 
   const isHost = searchParams.get("host") === "true" || userRole === "host";
 
+  // Callback ref to track when container is mounted
+  const setJitsiContainerRef = (element: HTMLDivElement | null) => {
+    jitsiContainerRef.current = element;
+    if (element) {
+      console.log("Container mounted via callback ref");
+      setContainerMounted(true);
+    } else {
+      console.log("Container unmounted via callback ref");
+      setContainerMounted(false);
+    }
+  };
+
+  // Log component render
+  console.log("MeetingPage rendering:", {
+    roomName,
+    userName,
+    containerMounted,
+    isInitialized,
+    isLoading,
+    error: !!error,
+  });
+
   useEffect(() => {
     if (!roomName) {
       navigate("/");
@@ -63,13 +86,26 @@ export const MeetingPage: React.FC = () => {
 
   // Separate effect for Jitsi initialization that waits for container
   useEffect(() => {
-    if (!roomName || !userName.trim() || isInitialized) {
+    if (!roomName || !userName.trim() || isInitialized || !containerMounted) {
+      console.log("Initialization blocked:", {
+        roomName: !!roomName,
+        userName: !!userName.trim(),
+        isInitialized,
+        containerMounted,
+      });
       return;
     }
 
     const initializeJitsi = async () => {
       try {
         console.log("Starting Jitsi initialization...");
+        console.log("DOM debugging:", {
+          containerRef: !!jitsiContainerRef.current,
+          containerById: !!document.getElementById("jitsi-container"),
+          bodyChildren: document.body.children.length,
+          documentReady: document.readyState,
+        });
+        
         setIsInitialized(true);
         setLoading(true);
         setError(null);
@@ -83,31 +119,25 @@ export const MeetingPage: React.FC = () => {
         await loadJitsiScript();
         console.log("Jitsi script loaded successfully");
 
-        // Robust container finding with retries
-        let containerElement: HTMLElement | null = null;
-        let retries = 0;
-        const maxRetries = 15;
+        // Get container element (should be available since containerMounted is true)
+        let containerElement = jitsiContainerRef.current || document.getElementById("jitsi-container") as HTMLDivElement;
         
-        while (!containerElement && retries < maxRetries) {
-          // Try ref first, then getElementById as fallback
-          containerElement = jitsiContainerRef.current || document.getElementById("jitsi-container");
-          
-          if (!containerElement) {
-            console.log(`Container not found, retry ${retries + 1}/${maxRetries}`);
-            await new Promise(resolve => setTimeout(resolve, 200));
-            retries++;
-          }
+        if (!containerElement) {
+          // Last resort - wait a bit more and try again
+          console.log("Container still not found, waiting additional time...");
+          await new Promise(resolve => setTimeout(resolve, 500));
+          containerElement = jitsiContainerRef.current || document.getElementById("jitsi-container") as HTMLDivElement;
         }
 
         if (!containerElement) {
-          throw new Error("Jitsi container not available after maximum retries");
+          throw new Error("Jitsi container not available despite containerMounted=true");
         }
 
-        console.log("Container found:", {
+        console.log("Container found and ready:", {
           viaRef: !!jitsiContainerRef.current,
           viaId: !!document.getElementById("jitsi-container"),
           element: !!containerElement,
-          retries: retries,
+          containerMounted,
         });
 
         if (roomName) {
@@ -255,6 +285,7 @@ export const MeetingPage: React.FC = () => {
     userEmail,
     isInitialized,
     navigate,
+    containerMounted,
   ]);
 
   const handleLeaveMeeting = () => {
@@ -296,6 +327,11 @@ export const MeetingPage: React.FC = () => {
 
   return (
     <div className="relative min-h-screen bg-gray-900">
+      {/* Debug info overlay */}
+      <div className="absolute top-0 left-0 z-50 p-2 text-xs text-white bg-red-600 bg-opacity-75">
+        Debug: Container={containerMounted ? 'YES' : 'NO'}, Init={isInitialized ? 'YES' : 'NO'}, Room={roomName || 'NONE'}
+      </div>
+
       {/* Meeting Info Bar */}
       {showControls && (
         <div className="absolute top-0 left-0 right-0 z-10 p-4 text-white bg-black bg-opacity-50">
@@ -527,7 +563,7 @@ export const MeetingPage: React.FC = () => {
       {/* Jitsi Container */}
       <div
         id="jitsi-container"
-        ref={jitsiContainerRef}
+        ref={setJitsiContainerRef}
         className="jitsi-container"
         style={{
           position: "fixed",
